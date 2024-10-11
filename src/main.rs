@@ -1,5 +1,5 @@
 use dotenv::dotenv;
-use poise::serenity_prelude::{self as serenity};
+use poise::serenity_prelude::{self as serenity, ClientBuilder};
 use services::{persistance::PersistanceClient, unmute};
 use settings::AppSettings;
 
@@ -16,14 +16,13 @@ struct State {
 async fn main() {
     dotenv().ok();
     let settings = AppSettings::new().unwrap();
+    let token = settings.discord_token.clone();
 
     let framework = poise::Framework::builder()
         .options(poise::FrameworkOptions {
             commands: commands::all(),
             ..Default::default()
         })
-        .token(&settings.discord_token)
-        .intents(serenity::GatewayIntents::non_privileged())
         .setup(|ctx, _ready, framework| {
             Box::pin(async move {
                 let redis_client = redis::Client::open(settings.redis_url.clone())?;
@@ -39,7 +38,6 @@ async fn main() {
                     settings.guild_id.into(),
                 )
                 .await?;
-                // poise::builtins::register_globally(ctx, &framework.options().commands).await?;
 
                 println!("Framework setup done");
                 Ok(State {
@@ -47,7 +45,12 @@ async fn main() {
                     persistance,
                 })
             })
-        });
+        })
+        .build();
 
-    framework.run().await.unwrap();
+    let client = ClientBuilder::new(&token, serenity::GatewayIntents::non_privileged())
+        .framework(framework)
+        .await;
+
+    client.unwrap().start().await.unwrap();
 }

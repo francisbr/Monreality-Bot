@@ -2,7 +2,7 @@ pub mod unmute {
     use std::{sync::Arc, time::Duration};
 
     use chrono::Utc;
-    use poise::serenity_prelude::Http;
+    use poise::serenity_prelude::{EditMember, Http};
     use tokio::sync::mpsc::unbounded_channel;
 
     use super::persistance::PersistanceClient;
@@ -52,24 +52,28 @@ pub mod unmute {
         guild_id: u64,
         user_id: u64,
     ) -> Result<(), anyhow::Error> {
-        let member = framework_client.get_member(guild_id, user_id).await?;
-        member.edit(framework_client, |m| m.mute(false)).await?;
+        framework_client
+            .edit_member(
+                guild_id.into(),
+                user_id.into(),
+                &EditMember::new().mute(false),
+                Some("Timeout done!"),
+            )
+            .await?;
 
         Ok(())
     }
 }
 
 pub mod persistance {
-    use std::time::Duration;
+    use std::{sync::LazyLock, time::Duration};
 
     use chrono::{DateTime, Utc};
-    use lazy_static::lazy_static;
     use r2d2::Pool;
     use redis::Commands;
 
-    lazy_static! {
-        static ref LAST_YEAR: DateTime<Utc> = Utc::now() - Duration::from_secs(60 * 60 * 24 * 365);
-    }
+    static LAST_YEAR: LazyLock<DateTime<Utc>> =
+        LazyLock::new(|| Utc::now() - Duration::from_secs(60 * 60 * 24 * 365));
 
     #[derive(Debug, Clone)]
     pub struct PersistanceClient {
